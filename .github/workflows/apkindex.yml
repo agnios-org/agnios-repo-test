@@ -1,0 +1,49 @@
+name: Generate APKINDEX and Sign
+
+on:
+  push:
+    branches:
+      - stable
+    paths:
+      - 'x86_64/*.apk'
+  pull_request:
+    branches:
+      - stable
+    paths:
+      - 'x86_64/*.apk'
+
+jobs:
+  generate-index:
+    runs-on: [self-hosted]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Signing Key
+        run: |
+          echo "${{ secrets.APK_SIGN_KEY }}" | base64 -d > myrepo.rsa
+          chmod 600 myrepo.rsa
+
+      - name: Generate APKINDEX.tar.gz and Sign
+        run: |
+          sudo docker run --rm \
+            -v ${{ github.workspace }}/x86_64:/repo \
+            -v ${{ github.workspace }}/myrepo.rsa:/key/myrepo.rsa \
+            -v ${{ github.workspace }}/keys:/tmp/keys \
+            alpine:latest \
+            sh -c "apk update && apk add alpine-sdk abuild openssl && \
+                   cd /repo && \
+                   cp /tmp/keys/-6850c78f.rsa.pub /etc/apk/keys/ && \
+                   apk index -o APKINDEX.tar.gz *.apk && \
+                   abuild-sign -k /key/myrepo.rsa APKINDEX.tar.gz && \
+                   openssl dgst -sha1 -sign /key/myrepo.rsa APKINDEX.tar.gz > APKINDEX.tar.gz.sig"
+
+      - name: Commit and Push
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add x86_64/APKINDEX.tar.gz x86_64/APKINDEX.tar.gz.sig
+          git commit -m "Update APKINDEX and signature" || echo "Nothing to commit"
+          git push
+

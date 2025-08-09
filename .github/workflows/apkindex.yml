@@ -31,13 +31,12 @@ jobs:
             -v ${{ github.workspace }}/x86_64:/repo \
             -v ${{ github.workspace }}/myrepo.rsa:/key/myrepo.rsa \
             -v ${{ github.workspace }}/keys:/tmp/keys \
-            alpine:latest \
+            agnios/alpine-agnios-image:latest \
             sh -c "apk update && apk add alpine-sdk abuild openssl && \
                    cd /repo && \
-                   cp /tmp/keys/-6886b799.rsa.pub /etc/apk/keys/ && \
                    apk index -o APKINDEX.tar.gz *.apk && \
-                   abuild-sign -k /key/myrepo.rsa APKINDEX.tar.gz && \
-                   openssl dgst -sha1 -sign /key/myrepo.rsa APKINDEX.tar.gz > APKINDEX.tar.gz.sig"
+                   abuild-sign -k /home/builder/.abuild/-6886b799.rsa APKINDEX.tar.gz && \
+                   openssl dgst -sha1 -sign /home/builder/.abuild/-6886b799.rsa.pub APKINDEX.tar.gz > APKINDEX.tar.gz.sig"
 
       - name: Commit and Push
         run: |

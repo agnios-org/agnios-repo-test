@@ -22,8 +22,8 @@ jobs:
 
       - name: Restore Signing Key
         run: |
-          echo "${{ secrets.APK_SIGN_KEY }}" | base64 -d > myrepo.rsa
-          chmod 600 myrepo.rsa
+          echo "${{ secrets.APK_SIGN_KEY }}" | base64 -d > ${{ github.workspace }}/keys/myrepo.rsa
+          chmod 600 ${{ github.workspace }}/keys/myrepo.rsa
 
       - name: Generate APKINDEX.tar.gz and Sign
         run: |
@@ -34,7 +34,7 @@ jobs:
             alpine:latest \
             sh -c "apk update && apk add alpine-sdk abuild openssl && \
                    cd /repo && \
-                   cp /tmp/keys/-6850c78f.rsa.pub /etc/apk/keys/ && \
+                   cp /tmp/keys/-6886b799.rsa.pub /etc/apk/keys/ && \
                    apk index -o APKINDEX.tar.gz *.apk && \
                    abuild-sign -k /key/myrepo.rsa APKINDEX.tar.gz && \
                    openssl dgst -sha1 -sign /key/myrepo.rsa APKINDEX.tar.gz > APKINDEX.tar.gz.sig"

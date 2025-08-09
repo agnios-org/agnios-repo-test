@@ -36,7 +36,7 @@ jobs:
                    cd /repo && \
                    apk index -o APKINDEX.tar.gz *.apk && \
                    abuild-sign -k /home/builder/.abuild/-6886b799.rsa APKINDEX.tar.gz && \
-                   openssl dgst -sha1 -sign /home/builder/.abuild/-6886b799.rsa.pub APKINDEX.tar.gz > APKINDEX.tar.gz.sig"
+                   openssl dgst -sha1 -sign /home/builder/.abuild/-6886b799.rsa APKINDEX.tar.gz > APKINDEX.tar.gz.sig"
 
       - name: Commit and Push
         run: |

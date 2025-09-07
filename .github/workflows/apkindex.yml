@@ -61,26 +61,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm --user root \
-            -v "$GITHUB_WORKSPACE/x86_64:/repo" \
-            -v "$GITHUB_WORKSPACE/keys/myrepo.rsa:/key/myrepo.rsa:ro" \
+          sudo docker run --rm \
+            -v ${{ github.workspace }}/x86_64:/repo \
+            -v ${{ github.workspace }}/myrepo.rsa:/key/myrepo.rsa \
+            -v ${{ github.workspace }}/keys:/tmp/keys \
             agnios/alpine-agnios-image:latest \
-            sh -lc '
-              set -euo pipefail
-              apk add --no-cache alpine-sdk abuild openssl
-              cd /repo
-              shopt -s nullglob
-              set -- *.apk
-              [ "$#" -gt 0 ] || { echo "No APKs found in /repo"; exit 1; }
-
-              # build index for the APKs in /repo
-              apk index -o APKINDEX.tar.gz "$@"
-
-              # sign index (produces APKINDEX.tar.gz.sig)
-              abuild-sign -k /key/myrepo.rsa APKINDEX.tar.gz
-
-              ls -lh APKINDEX.tar.gz APKINDEX.tar.gz.sig
-            '
+            sh -c "sudo apk update && sudo apk add alpine-sdk abuild openssl && \
+                   cd /repo && \
+                   apk index -o APKINDEX.tar.gz *.apk && \
+                   abuild-sign -k /home/builder/.abuild/-6886b799.rsa APKINDEX.tar.gz && \
+                   openssl dgst -sha1 -sign /home/builder/.abuild/-6886b799.rsa APKINDEX.tar.gz > APKINDEX.tar.gz.sig"
 
       - name: Commit and push
         shell: bash

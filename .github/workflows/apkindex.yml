@@ -2,65 +2,32 @@ name: Generate APKINDEX and Sign
 
 on:
   push:
-    branches: [stable]
+    branches:
+      - stable
     paths:
       - 'x86_64/*.apk'
   pull_request:
-    branches: [stable]
+    branches:
+      - stable
     paths:
       - 'x86_64/*.apk'
-
 permissions:
   contents: write
-
 jobs:
   generate-index:
-    runs-on: self-hosted
+    runs-on: [self-hosted]
 
     steps:
-      - name: Checkout (with Git LFS)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
-      - name: Ensure LFS files are present (no pointer files)
-        shell: bash
+      - name: Restore Signing Key
         run: |
-          set -euo pipefail
-          git lfs install
-          git lfs pull
+          echo "${{ secrets.APK_SIGN_KEY }}" | base64 -d > ${{ github.workspace }}/keys/myrepo.rsa
+          chmod 600 ${{ github.workspace }}/keys/myrepo.rsa
 
-          shopt -s nullglob
-          files=(x86_64/*.apk)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No APKs found in x86_64/. Nothing to index."
-            exit 1
-          fi
-
-          # Fail fast if any APK is still an LFS pointer
-          if grep -q -m1 'git-lfs.github.com/spec/v1' "${files[@]}"; then
-            echo "ERROR: LFS pointer files detected in x86_64/. Did you push LFS objects?" >&2
-            exit 1
-          fi
-
-          echo "Showing first up to 20 APKs:"
-          for f in "${files[@]:0:20}"; do ls -lh "$f"; done
-
-      - name: Restore signing key
-        shell: bash
-        env:
-          APK_SIGN_KEY: ${{ secrets.APK_SIGN_KEY }}   # base64 of myrepo.rsa
+      - name: Generate APKINDEX.tar.gz and Sign
         run: |
-          set -euo pipefail
-          install -d -m 700 "$GITHUB_WORKSPACE/keys"
-          # decode to file (single-line b64 secret recommended)
-          printf '%s' "$APK_SIGN_KEY" | tr -d '\r\n' | base64 -d > "$GITHUB_WORKSPACE/keys/myrepo.rsa"
-          chmod 600 "$GITHUB_WORKSPACE/keys/myrepo.rsa"
-
-      - name: Generate APKINDEX.tar.gz and sign
-        shell: bash
-        run: |
-          set -euo pipefail
           sudo docker run --rm \
             -v ${{ github.workspace }}/x86_64:/repo \
             -v ${{ github.workspace }}/myrepo.rsa:/key/myrepo.rsa \
@@ -72,16 +39,10 @@ jobs:
                    abuild-sign -k /home/builder/.abuild/-6886b799.rsa APKINDEX.tar.gz && \
                    openssl dgst -sha1 -sign /home/builder/.abuild/-6886b799.rsa APKINDEX.tar.gz > APKINDEX.tar.gz.sig"
 
-      - name: Commit and push
-        shell: bash
+      - name: Commit and Push
         run: |
-          set -e
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
           git add x86_64/APKINDEX.tar.gz x86_64/APKINDEX.tar.gz.sig
-          if git diff --cached --quiet; then
-            echo "Nothing to commit"
-          else
-            git commit -m "Update APKINDEX and signature"
-            git push
-          fi
+          git commit -m "Update APKINDEX and signature" || echo "Nothing to commit"
+          git push
